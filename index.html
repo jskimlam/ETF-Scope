@@ -144,7 +144,7 @@ tbody tr:hover td{background:#f8fbff}
         <div class="small">기간은 년 단위로 직접 입력. 연금계좌 선택 시 안전자산 30% 이상을 자동 강제합니다.</div>
         <div class="sim-form" style="margin-top:12px">
           <div class="field"><label>계좌 유형 <span id="pensionRule">일반계좌</span></label><select id="accountType" onchange="runPortfolio()"><option value="normal">일반계좌</option><option value="pension">연금계좌 - 안전 30% 필수</option></select></div>
-          <div class="field"><label>시드머니</label><input id="seed" type="number" value="10000000" step="1000000" oninput="runPortfolio()" /></div>
+          <div class="field"><label>시드머니 / 백만원 단위 <span id="seedPreview">1,000만원</span></label><div class="money-input"><input id="seedMillion" type="number" value="10" min="0" step="1" oninput="runPortfolio()" /><b>백만원</b></div></div>
           <div class="field"><label>투자기간 / 년 <span>예: 0.5, 1, 3, 10</span></label><input id="years" type="number" value="10" min="0.1" step="0.1" oninput="runPortfolio()" /></div>
           <div class="field"><label>투자성향</label><select id="profile" onchange="runPortfolio()"><option value="income">분배금 극대화</option><option value="balanced" selected>분배금+위험 균형</option><option value="stable">안정형</option><option value="growth">총수익형</option></select></div>
           <div class="field"><label>최대 편입 종목 수</label><select id="maxHoldings" onchange="runPortfolio()"><option>3</option><option selected>5</option><option>8</option><option>10</option><option>12</option></select></div>
@@ -243,7 +243,8 @@ function mini(id,rows,val){document.getElementById(id).innerHTML=rows.map(x=>`<d
 function openDetail(code){const x=DATA.items.find(i=>i.code===code);if(!x)return;document.getElementById('mTitle').textContent=x.name;document.getElementById('mSub').textContent=`${x.code} / ${x.manager} / ${x.category} / ${x.baseAsset||'-'}`;document.getElementById('mChart').innerHTML=svgLine(x.distributions);document.getElementById('mInfo').innerHTML=[['최근월',x.latestMonth],['최근월 분배율',fmt(x.latestRate)+'%'],['최근월 분배금',won(x.latestAmount)],['6개월 평균',fmt(x.avg6mRate)+'%'],['연환산 분배율',fmt(x.annualizedRate)+'%'],['현재가',won(x.currentPrice)],['1년 수익률',fmt(x.oneYearReturn)+'%'],['연금 안전자산',x.safeAsset?'해당':'비해당'],['위험점수',fmt(x.riskScore)],['전략',x.strategy||'-'],['경고',x.warning||'-']].map(([k,v])=>`<div class="info-row"><span>${k}</span><b>${esc(v)}</b></div>`).join('');document.getElementById('modal').classList.add('show')}
 function closeModal(){document.getElementById('modal').classList.remove('show')}
 function runPortfolio(){
-  const seed=Number(document.getElementById('seed').value||0), years=Math.max(.1,Number(document.getElementById('years').value||1)), months=years*12, account=document.getElementById('accountType').value, profile=document.getElementById('profile').value, maxH=Number(document.getElementById('maxHoldings').value), cap=Number(document.getElementById('maxWeight').value)/100;
+  const seedMillion=Number(document.getElementById('seedMillion').value||0), seed=seedMillion*1000000, years=Math.max(.1,Number(document.getElementById('years').value||1)), months=years*12, account=document.getElementById('accountType').value, profile=document.getElementById('profile').value, maxH=Number(document.getElementById('maxHoldings').value), cap=Number(document.getElementById('maxWeight').value)/100;
+  const preview=document.getElementById('seedPreview'); if(preview) preview.textContent=seed>=100000000?fmt(seed/100000000)+'억원':Math.round(seed/10000).toLocaleString('ko-KR')+'만원';
   document.getElementById('pensionRule').textContent=account==='pension'?'안전자산 30% 자동 적용':'일반계좌';
   let cand=DATA.items.filter(x=>n(x.latestRate)>0&&n(x.currentPrice)>0);
   cand.forEach(x=>x._score=score(x,profile));
