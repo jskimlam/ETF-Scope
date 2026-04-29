@@ -173,10 +173,11 @@ tbody tr:hover td{background:#f8fbff}
           <div class="field"><label>투자기간 / 년 <span>예: 0.5, 1, 3, 10</span></label><input id="years" type="number" value="10" min="0.1" step="0.1" oninput="runPortfolio()" /></div>
           <div class="field"><label>연간 주가변동 가정 <span>원금 평가액 계산</span></label><select id="priceScenario" onchange="runPortfolio()"><option value="-5">매년 -5% 하락</option><option value="-2">매년 -2% 하락</option><option value="-1">매년 -1% 하락</option><option value="0" selected>0% 보합</option><option value="1">매년 +1% 상승</option><option value="2">매년 +2% 상승</option><option value="5">매년 +5% 상승</option></select></div>
           <div class="field"><label>분배금 재투자율 <span id="reinvestPreview">100%</span></label><input id="reinvestRate" type="number" value="100" min="0" max="100" step="5" oninput="this.value=Math.max(0,Math.min(100,Number(this.value||0)));document.getElementById('reinvestPreview').textContent=this.value+'%';runPortfolio()" /></div>
+          <div class="field"><label>재투자 주기 <span>월별/연별 선택</span></label><select id="reinvestFrequency" onchange="runPortfolio()"><option value="yearly" selected>매년 말 재투자</option><option value="monthly">매월 즉시 재투자</option></select></div>
           <div class="field"><label>투자성향</label><select id="profile" onchange="runPortfolio()"><option value="income">분배금 극대화</option><option value="balanced" selected>분배금+위험 균형</option><option value="stable">안정형</option><option value="growth">총수익형</option></select></div>
           <div class="field"><label>최대 편입 종목 수</label><select id="maxHoldings" onchange="runPortfolio()"><option>3</option><option selected>5</option><option>8</option><option>10</option><option>12</option></select></div>
           <div class="field"><label>개별 종목 최대 비중</label><select id="maxWeight" onchange="runPortfolio()"><option value="20">20%</option><option value="25">25%</option><option value="30" selected>30%</option><option value="40">40%</option><option value="50">50%</option></select></div>
-          <div class="notice blue" id="simNote">세금은 단순 추정입니다. 분배금 재투자율에 따라 일부/전부를 같은 포트폴리오 비중으로 재투자하며, 재투자된 원금에서 다음 기간 분배금이 다시 발생합니다. 추정 총자산은 주가변동을 반영한 원금 평가액+미재투자 세후 현금입니다. 일반계좌는 분배금 15.4%만 단순 반영하고 가격평가손익 과세는 제외했습니다. ISA는 참고용으로 분배금+평가손익을 누적 순이익으로 보고 일반형 200만원/서민·농어민형 400만원 비과세 후 초과분 9.9%로 계산합니다. 연금계좌는 운용기간 중 과세이연으로 표시합니다.</div>
+          <div class="notice blue" id="simNote">세금은 단순 추정입니다. 분배금 재투자율과 재투자 주기에 따라 일부/전부를 같은 종목에 재투자합니다. 이번 버전은 금액 복리가 아니라 실제 ETF 주수 매수 방식으로 계산합니다. 주가가 상승하면 같은 분배금으로 살 수 있는 주수가 줄고, 하락하면 살 수 있는 주수가 늘어납니다. 추정 총자산은 주가변동을 반영한 원금 평가액+미재투자 세후 현금입니다. 일반계좌는 분배금 15.4%만 단순 반영하고 가격평가손익 과세는 제외했습니다. ISA는 참고용으로 분배금+평가손익을 누적 순이익으로 보고 일반형 200만원/서민·농어민형 400만원 비과세 후 초과분 9.9%로 계산합니다. 연금계좌는 운용기간 중 과세이연으로 표시합니다.</div>
         </div>
       </div>
       <div>
@@ -190,7 +191,7 @@ tbody tr:hover td{background:#f8fbff}
 
     <div class="port-grid" style="margin-top:14px">
       <div class="board"><div class="board-head"><div class="board-title">편입 종목<small>비중, 투자금, 예상 월분배금</small></div></div><div class="tablebox" style="max-height:420px"><table id="simTbl"></table></div></div>
-      <div class="board"><div class="board-head"><div class="board-title">년도별 시뮬레이션 가로표<small>재투자 반영: 1년후 · 2년후 · … 10년후 월분배금/원금평가액 변화</small></div></div><div class="tablebox wide-tablebox"><table id="yearTbl"></table></div></div>
+      <div class="board"><div class="board-head"><div class="board-title">년도별 시뮬레이션 가로표<small>재투자율/재투자 주기 반영: 1년후 · 2년후 · … 월분배금/원금평가액 변화</small></div></div><div class="tablebox wide-tablebox"><table id="yearTbl"></table></div></div>
       <div class="board"><div class="board-head"><div class="board-title">주가변동 시나리오 비교<small>분배금 재투자율 반영, 매년 ±1/±2/±5% 평가 변화</small></div></div><div class="tablebox" style="max-height:420px"><table id="scenarioTbl"></table></div></div>
     </div>
   </section>
@@ -274,13 +275,13 @@ function runPortfolio(){
   const seedMillion=Number(document.getElementById('seedMillion').value||0);
   const seed=seedMillion*1000000;
   const years=Math.max(.1,Number(document.getElementById('years').value||1));
-  const months=years*12;
   const account=document.getElementById('accountType').value;
   const profile=document.getElementById('profile').value;
   const maxH=Number(document.getElementById('maxHoldings').value);
   const cap=Number(document.getElementById('maxWeight').value)/100;
   const priceScenario=Number((document.getElementById('priceScenario')||{}).value||0)/100;
   const reinvestRate=Math.max(0,Math.min(100,Number((document.getElementById('reinvestRate')||{}).value||0)))/100;
+  const reinvestFrequency=(document.getElementById('reinvestFrequency')||{}).value || 'yearly';
   const reinvestPrev=document.getElementById('reinvestPreview'); if(reinvestPrev) reinvestPrev.textContent=fmt(reinvestRate*100,0)+'%';
   const preview=document.getElementById('seedPreview'); if(preview) preview.textContent=seed>=100000000?fmt(seed/100000000)+'억원':Math.round(seed/10000).toLocaleString('ko-KR')+'만원';
   document.getElementById('pensionRule').textContent=accountLabel(account);
@@ -305,114 +306,197 @@ function runPortfolio(){
   const totalW=weights.reduce((a,b)=>a+b,0)||1;
   weights=weights.map(w=>w/totalW);
 
-  const sim=simulateReinvest(selected,weights,seed,years,account,priceScenario,reinvestRate);
+  const sim=simulateReinvest(selected,weights,seed,years,account,priceScenario,reinvestRate,reinvestFrequency);
   const safeWeight=sim.holdings.filter(x=>x.safeAsset).reduce((s,x)=>s+x.weight,0);
+  const freqLabel=reinvestFrequency==='monthly'?'매월 즉시':'매년 말';
 
   renderSimSummary([
     {label:'현재 월 예상 분배금', value:won(sim.startMonthly), note:'투자 직후 / 세전'},
-    {label:fmt(years)+'년 세전 분배금', value:won(sim.grossDist), note:'재투자 전 총 발생분'},
-    {label:'원금 평가액', value:won(sim.principalEnd), note:'재투자 원금+주가변동 반영'},
+    {label:fmt(years)+'년 세전 분배금', value:won(sim.grossDist), note:'총 발생분 / '+freqLabel+' 재투자'},
+    {label:'주식 평가액', value:won(sim.principalEnd), note:'보유주수×시나리오 가격'},
     {label:'평가손익', value:won(sim.valuationGain), note:'총 투입원금 대비', cls:sim.valuationGain<0?'neg':'pos'},
     {label:'예상 세금', value:won(sim.tax), note:sim.taxNote},
-    {label:'미재투자 세후 현금', value:won(sim.cashAfterTax), note:'수령 후 재투자하지 않은 현금'},
-    {label:'추정 총자산', value:won(sim.finalAsset), note:'원금평가액+세후현금', cls:sim.finalAsset<seed?'neg':'pos'},
-    {label:'재투자율 / 안전비중', value:fmt(reinvestRate*100,0)+'% / '+fmt(safeWeight*100)+'%', note:account==='pension'?'안전 30% 이상':'재투자 조건'}
+    {label:'현금 잔액', value:won(sim.cashAfterTax), note:'미재투자/매수잔액/세후'},
+    {label:'추정 총자산', value:won(sim.finalAsset), note:'주식평가액+현금잔액', cls:sim.finalAsset<seed?'neg':'pos'},
+    {label:'재투자율 / 주기', value:fmt(reinvestRate*100,0)+'% / '+freqLabel, note:account==='pension'?'안전 '+fmt(safeWeight*100)+'%':'안전 '+fmt(safeWeight*100)+'%'}
   ]);
 
-  const acctMsg=(account==='pension'?'연금계좌 안전자산 '+fmt(safeWeight*100)+'% 적용':' '+accountLabel(account)+' · 안전자산 '+fmt(safeWeight*100)+'%')+' · 주가변동 '+fmt(priceScenario*100)+'%/년 · 분배금 재투자 '+fmt(reinvestRate*100,0)+'%';
+  const acctMsg=(account==='pension'?'연금계좌 안전자산 '+fmt(safeWeight*100)+'% 적용':' '+accountLabel(account)+' · 안전자산 '+fmt(safeWeight*100)+'%')+' · 주가변동 '+fmt(priceScenario*100)+'%/년 · 분배금 재투자 '+fmt(reinvestRate*100,0)+'% · '+freqLabel;
   document.getElementById('allocMsg').innerHTML=acctMsg + '<div class="allocbar"><span style="width:'+Math.min(100,safeWeight*100)+'%"></span></div>';
 
-  document.getElementById('simTbl').innerHTML='<thead><tr><th>종목</th><th>안전</th><th>비중</th><th>초기투자금</th><th>초기주수</th><th>월분배율</th><th>초기 월분배금</th><th>최종 평가액</th><th>평가손익</th><th>기간 세전분배금</th></tr></thead><tbody>'+
-    sim.holdings.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+(x.safeAsset?'안전':'-')+'</td><td>'+fmt(x.weight*100)+'%</td><td>'+won(x.initialInvest)+'</td><td>'+x.initialShares.toLocaleString('ko-KR')+'</td><td>'+fmt(x.latestRate)+'%</td><td>'+won(x.startMonthly)+'</td><td>'+won(x.finalValue)+'</td><td class="'+(x.valuationGain<0?'down':'up')+'">'+won(x.valuationGain)+'</td><td>'+won(x.grossDist)+'</td></tr>').join('')+
+  document.getElementById('simTbl').innerHTML='<thead><tr><th>종목</th><th>안전</th><th>비중</th><th>초기투자금</th><th>초기주수</th><th>최종주수</th><th>월 주당분배금</th><th>초기 월분배금</th><th>최종 평가액</th><th>평가손익</th><th>기간 세전분배금</th></tr></thead><tbody>'+
+    sim.holdings.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+(x.safeAsset?'안전':'-')+'</td><td>'+fmt(x.weight*100)+'%</td><td>'+won(x.initialInvest)+'</td><td>'+x.initialShares.toLocaleString('ko-KR')+'</td><td>'+x.shares.toLocaleString('ko-KR')+'</td><td>'+won(x.distPerShare)+'</td><td>'+won(x.startMonthly)+'</td><td>'+won(x.finalValue)+'</td><td class="'+(x.valuationGain<0?'down':'up')+'">'+won(x.valuationGain)+'</td><td>'+won(x.grossDist)+'</td></tr>').join('')+
     '</tbody>';
 
   renderDonut(sim.holdings);
-  renderYearTable(sim,seed,account,priceScenario,reinvestRate);
-  renderScenarioTable(selected,weights,years,account,seed,reinvestRate);
+  renderYearTable(sim,seed,account,priceScenario,reinvestRate,reinvestFrequency);
+  renderScenarioTable(selected,weights,years,account,seed,reinvestRate,reinvestFrequency);
 }
 
-function simulateReinvest(selected,weights,seed,years,account,priceScenario,reinvestRate){
+function simulateReinvest(selected,weights,seed,years,account,priceScenario,reinvestRate,reinvestFrequency){
   const months=Math.max(1,Math.round(years*12));
   const monthPrice=Math.pow(1+priceScenario,1/12)-1;
+
   const holdings=selected.map((x,i)=>{
     const initialInvest=seed*weights[i];
-    const price=n(x.currentPrice)||1;
-    const initialShares=Math.floor(initialInvest/price);
-    const startMonthly=initialInvest*n(x.latestRate)/100;
+    const price0=n(x.currentPrice)||1;
+    const shares=Math.floor(initialInvest/price0);
+    const unspent=initialInvest-shares*price0;
+    const distPerShare=n(x.latestAmount) || price0*n(x.latestRate)/100;
     return {
       ...x,
       weight:weights[i],
       initialInvest,
-      units:initialInvest,
-      initialShares,
-      startMonthly,
-      grossDist:0
+      price0,
+      currentPriceSim:price0,
+      shares,
+      initialShares:shares,
+      distPerShare,
+      pendingReinvest:unspent,
+      unspentCash:unspent,
+      startMonthly:shares*distPerShare,
+      grossDist:0,
+      taxPaid:0,
+      cashAfterTax:0
     };
   });
+
   const points=[];
-  let cashGross=0;
+  let portfolioCash=0;
+  let totalTaxPaid=0;
+
   for(let m=1;m<=months;m++){
-    holdings.forEach(h=>{ h.units*=1+monthPrice; });
-    const monthlyGross=holdings.reduce((s,h)=>s+h.units*n(h.latestRate)/100,0);
+    // 월별 가격 경로 반영. 가격이 오르면 같은 분배금으로 매수 가능한 주식수가 줄어든다.
+    holdings.forEach(h=>{ h.currentPriceSim*=1+monthPrice; });
+
+    let monthlyGross=0;
+
     holdings.forEach(h=>{
-      const dist=h.units*n(h.latestRate)/100;
+      const dist=h.shares*h.distPerShare;
+      monthlyGross+=dist;
       h.grossDist+=dist;
-      h.units+=dist*reinvestRate;
+
+      let taxNow=0;
+      let netDist=dist;
+      // 일반계좌는 분배금 지급 시 15.4% 원천징수 후 재투자 가능하다고 가정
+      if(account==='normal'){
+        taxNow=dist*0.154;
+        netDist=dist-taxNow;
+        h.taxPaid+=taxNow;
+        totalTaxPaid+=taxNow;
+      }
+
+      const reinvestCash=netDist*reinvestRate;
+      const cashTake=netDist*(1-reinvestRate);
+      portfolioCash+=cashTake;
+      h.cashAfterTax+=cashTake;
+
+      if(reinvestFrequency==='monthly'){
+        h.pendingReinvest+=reinvestCash;
+        const buyShares=Math.floor(h.pendingReinvest/h.currentPriceSim);
+        if(buyShares>0){
+          h.shares+=buyShares;
+          h.pendingReinvest-=buyShares*h.currentPriceSim;
+        }
+      }else{
+        h.pendingReinvest+=reinvestCash;
+      }
     });
-    cashGross+=monthlyGross*(1-reinvestRate);
+
+    // 매년 말 재투자: 연중 모은 재투자 현금으로 해당 종목을 정수주 매수
+    if(reinvestFrequency==='yearly' && (m%12===0 || m===months)){
+      holdings.forEach(h=>{
+        const buyShares=Math.floor(h.pendingReinvest/h.currentPriceSim);
+        if(buyShares>0){
+          h.shares+=buyShares;
+          h.pendingReinvest-=buyShares*h.currentPriceSim;
+        }
+      });
+    }
 
     if(m%12===0 || m===months){
       const elapsed=m/12;
-      const principal=holdings.reduce((s,h)=>s+h.units,0);
+      const stockValue=holdings.reduce((s,h)=>s+h.shares*h.currentPriceSim,0);
+      const pendingCash=holdings.reduce((s,h)=>s+h.pendingReinvest,0);
       const grossDist=holdings.reduce((s,h)=>s+h.grossDist,0);
-      const reinvested=grossDist*reinvestRate;
-      const cashBeforeTax=cashGross;
-      const valuationGain=principal-(seed+reinvested);
-      const taxInfo=calcTax(cashBeforeTax,account,valuationGain);
-      const cashAfterTax=cashBeforeTax-taxInfo.tax;
+      const reinvestedCash=grossDist*reinvestRate;
+      const cashBeforeFinalTax=portfolioCash+pendingCash;
+      const totalBeforeFinalTax=stockValue+cashBeforeFinalTax;
+      let tax=totalTaxPaid;
+      if(account==='isa_general' || account==='isa_low'){
+        const allowance=account==='isa_general'?2000000:4000000;
+        const profit=Math.max(0,totalBeforeFinalTax-seed);
+        tax=Math.max(0,profit-allowance)*0.099;
+      }
+      if(account==='pension') tax=0;
+
+      const cashAfterTax=(account==='normal') ? cashBeforeFinalTax : Math.max(0,cashBeforeFinalTax-tax);
+      const valuationGain=stockValue+pendingCash-seed-reinvestedCash;
+      const monthlyAtPoint=holdings.reduce((s,h)=>s+h.shares*h.distPerShare,0);
+
       points.push({
         label:(Math.abs(elapsed-Math.round(elapsed))<.001?Math.round(elapsed):fmt(elapsed,1))+'년후',
         months:m,
         elapsed,
-        monthlyGross,
+        monthlyGross:monthlyAtPoint,
         yearGross:null,
         grossDist,
-        reinvested,
-        cashBeforeTax,
-        principal,
+        reinvested:reinvestedCash,
+        cashBeforeTax:cashBeforeFinalTax,
+        principal:stockValue,
+        pendingCash,
         valuationGain,
-        tax:taxInfo.tax,
+        tax,
         cashAfterTax,
-        total:principal+cashAfterTax
+        total:stockValue+cashAfterTax
       });
     }
   }
+
   let prev=0;
   points.forEach(p=>{p.yearGross=p.grossDist-prev; prev=p.grossDist;});
-  const principalEnd=holdings.reduce((s,h)=>s+h.units,0);
+
+  const stockValue=holdings.reduce((s,h)=>s+h.shares*h.currentPriceSim,0);
+  const pendingCash=holdings.reduce((s,h)=>s+h.pendingReinvest,0);
   const grossDist=holdings.reduce((s,h)=>s+h.grossDist,0);
   const reinvested=grossDist*reinvestRate;
-  const cashBeforeTax=cashGross;
-  const valuationGain=principalEnd-(seed+reinvested);
-  const taxInfo=calcTax(cashBeforeTax,account,valuationGain);
-  const cashAfterTax=cashBeforeTax-taxInfo.tax;
+  const cashBeforeFinalTax=portfolioCash+pendingCash;
+  const totalBeforeFinalTax=stockValue+cashBeforeFinalTax;
+  let tax=totalTaxPaid;
+  let taxNote='분배금 15.4% 원천징수 후 재투자';
+  if(account==='isa_general' || account==='isa_low'){
+    const allowance=account==='isa_general'?2000000:4000000;
+    const profit=Math.max(0,totalBeforeFinalTax-seed);
+    tax=Math.max(0,profit-allowance)*0.099;
+    taxNote=account==='isa_general'?'ISA 일반형: 순이익 200만원 비과세 후 9.9%':'ISA 서민/농어민형: 순이익 400만원 비과세 후 9.9%';
+  }
+  if(account==='pension'){
+    tax=0;
+    taxNote='연금계좌 운용기간 중 과세이연';
+  }
+
+  const cashAfterTax=(account==='normal') ? cashBeforeFinalTax : Math.max(0,cashBeforeFinalTax-tax);
+  const valuationGain=stockValue+pendingCash-seed-reinvested;
+
   holdings.forEach(h=>{
-    h.finalValue=h.units;
-    h.valuationGain=h.finalValue-(h.initialInvest+h.grossDist*reinvestRate);
+    h.finalValue=h.shares*h.currentPriceSim;
+    h.valuationGain=h.finalValue+h.pendingReinvest-h.initialInvest-h.grossDist*reinvestRate;
   });
+
   return {
     holdings,
     points,
     startMonthly:holdings.reduce((s,h)=>s+h.startMonthly,0),
     grossDist,
     reinvested,
-    cashBeforeTax,
-    principalEnd,
+    cashBeforeTax:cashBeforeFinalTax,
+    principalEnd:stockValue,
+    pendingCash,
     valuationGain,
-    tax:taxInfo.tax,
-    taxNote:taxInfo.note,
+    tax,
+    taxNote,
     cashAfterTax,
-    finalAsset:principalEnd+cashAfterTax
+    finalAsset:stockValue+cashAfterTax
   };
 }
 
@@ -462,7 +546,7 @@ function score(x,profile){const income=n(x.latestRate)*40+n(x.avg6mRate)*20; con
 function normalize(arr){const s=arr.reduce((a,b)=>a+b,0)||1;return arr.map(x=>x/s)}
 function capWeights(weights,cap){let w=[...weights];for(let loop=0;loop<10;loop++){let excess=0,free=[];w=w.map((v,i)=>{if(v>cap){excess+=v-cap;return cap}free.push(i);return v});if(excess<=.0001||!free.length)break;const fs=free.reduce((s,i)=>s+w[i],0)||1;free.forEach(i=>w[i]+=excess*w[i]/fs)}return normalize(w)}
 function renderDonut(res){let start=0;const grad=res.map((x,i)=>{const end=start+x.weight*100;const s=`${COLORS[i%COLORS.length]} ${start}% ${end}%`;start=end;return s}).join(',');document.getElementById('donut').style.background=`conic-gradient(${grad})`;document.getElementById('legend').innerHTML=res.map((x,i)=>`<div class="legend-row"><span><i class="sw" style="background:${COLORS[i%COLORS.length]}"></i>${esc(x.name)}</span><b>${fmt(x.weight*100)}%</b><b>${won(x.monthly)}/월</b></div>`).join('')}
-function renderYearTable(sim,seed,account,priceScenario,reinvestRate){
+function renderYearTable(sim,seed,account,priceScenario,reinvestRate,reinvestFrequency){
   const points=sim.points||[];
   if(!points.length){
     document.getElementById('yearTbl').innerHTML='<tbody><tr><td>투자기간을 0.1년 이상 입력하세요.</td></tr></tbody>';
@@ -476,23 +560,23 @@ function renderYearTable(sim,seed,account,priceScenario,reinvestRate){
     row('세전 누적분배금',p=>won(p.grossDist))+
     row('재투자 누적금액',p=>won(p.reinvested))+
     row('미재투자 세전현금',p=>won(p.cashBeforeTax))+
-    row('원금 평가액',p=>won(p.principal))+
+    row('주식 평가액',p=>won(p.principal))+
+    row('매수대기 현금',p=>won(p.pendingCash||0))+
     row('평가손익',p=>won(p.valuationGain),p=>p.valuationGain<0?'down':'up')+
     row('예상세금',p=>won(p.tax))+
-    row('미재투자 세후현금',p=>won(p.cashAfterTax))+
+    row('현금 잔액',p=>won(p.cashAfterTax))+
     row('추정 총자산',p=>won(p.total))+
     row('원금 대비 총수익률',p=>fmt((p.total/seed-1)*100)+'%',p=>(p.total-seed)<0?'down':'up')+
     '</tbody>';
   document.getElementById('yearTbl').innerHTML=headers+body;
 }
-function renderScenarioTable(selected,weights,years,account,seed,reinvestRate){
+function renderScenarioTable(selected,weights,years,account,seed,reinvestRate,reinvestFrequency){
   const scenarios=[-0.05,-0.02,-0.01,0,0.01,0.02,0.05];
-  document.getElementById('scenarioTbl').innerHTML='<thead><tr><th>연간 주가변동</th><th>최종 월분배금</th><th>세전 누적분배금</th><th>재투자금액</th><th>원금 평가액</th><th>미재투자 세후현금</th><th>추정 총자산</th></tr></thead><tbody>'+
+  document.getElementById('scenarioTbl').innerHTML='<thead><tr><th>연간 주가변동</th><th>최종 월분배금</th><th>세전 누적분배금</th><th>재투자금액</th><th>주식 평가액</th><th>현금 잔액</th><th>추정 총자산</th></tr></thead><tbody>'+
     scenarios.map(r=>{
-      const sim=simulateReinvest(selected,weights,seed,years,account,r,reinvestRate);
+      const sim=simulateReinvest(selected,weights,seed,years,account,r,reinvestRate,reinvestFrequency);
       const last=sim.points[sim.points.length-1]||{};
-      const total=sim.finalAsset;
-      return '<tr><td class="'+(r<0?'down':r>0?'up':'')+'">'+(r>0?'+':'')+fmt(r*100)+'%</td><td>'+won(last.monthlyGross||0)+'</td><td>'+won(sim.grossDist)+'</td><td>'+won(sim.reinvested)+'</td><td>'+won(sim.principalEnd)+'</td><td>'+won(sim.cashAfterTax)+'</td><td><b>'+won(total)+'</b></td></tr>'
+      return '<tr><td class="'+(r<0?'down':r>0?'up':'')+'">'+(r>0?'+':'')+fmt(r*100)+'%</td><td>'+won(last.monthlyGross||0)+'</td><td>'+won(sim.grossDist)+'</td><td>'+won(sim.reinvested)+'</td><td>'+won(sim.principalEnd)+'</td><td>'+won(sim.cashAfterTax)+'</td><td><b>'+won(sim.finalAsset)+'</b></td></tr>'
     }).join('')+'</tbody>';
 }
 
