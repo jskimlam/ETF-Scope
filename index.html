@@ -265,6 +265,13 @@ tbody tr:last-child td{border-bottom:none}
   font-family:var(--mono);font-size:12px;color:var(--text2);
 }
 
+/* ════ HISTORY TAB ════ */
+.hist-legend{display:flex;flex-wrap:wrap;gap:10px}
+.hist-legend-item{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:12px;color:var(--text2)}
+.hist-dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.hist-sort-group{display:flex;gap:6px}
+.hist-sort-btn.active{background:var(--gold-dim);border-color:var(--gold2);color:var(--gold)}
+
 /* ════ SIM SUMMARY (HTS 가로 패널) ════ */
 .hts-panel{
   display:grid;grid-template-columns:repeat(8,1fr);
@@ -426,6 +433,7 @@ textarea:focus{border-color:var(--gold)}
   <button class="tab active" data-tab="scope">종목 스코프</button>
   <button class="tab" data-tab="finder">후보 랭킹</button>
   <button class="tab" data-tab="simulator">포트폴리오 시뮬</button>
+  <button class="tab" data-tab="history">월별 히스토리</button>
   <button class="tab" data-tab="update">데이터 업데이트</button>
 </nav>
 
@@ -660,6 +668,53 @@ textarea:focus{border-color:var(--gold)}
   </div>
 </section>
 
+<!-- ══ HISTORY PANEL ══ -->
+<section id="history" class="panel content">
+  <div class="update-grid" style="grid-template-columns:340px 1fr">
+    <div class="update-card">
+      <div class="update-card-head">
+        <div class="board-hd-title">종목 선택 (다중 비교 가능)</div>
+        <div class="update-card-sub">체크한 종목들의 월별 분배율 추이를 그래프와 표로 함께 비교합니다</div>
+      </div>
+      <div class="update-card-body" style="padding:10px">
+        <div class="selector-search" style="margin-bottom:8px">
+          <input id="historyQ" placeholder="종목명 / 코드 검색" oninput="renderHistorySelector()" style="width:100%"/>
+        </div>
+        <div class="selector-list" id="historySelectList" style="max-height:480px"></div>
+        <div class="selector-footer">
+          <span id="historySelectionSummary">선택 종목 없음</span>
+          <button class="btn" onclick="clearHistorySelection()">선택 해제</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="tbl-wrap">
+        <div class="tbl-head">
+          <div>
+            <div class="tbl-title">월별 분배율 추이 그래프</div>
+            <div class="tbl-sub">선택한 종목들의 분배율(%)을 월별로 비교합니다</div>
+          </div>
+          <div class="hist-legend" id="historyLegend"></div>
+        </div>
+        <div id="historyChart" style="padding:10px"></div>
+      </div>
+      <div class="tbl-wrap" style="margin-top:14px">
+        <div class="tbl-head">
+          <div>
+            <div class="tbl-title">월별 상세 내역</div>
+            <div class="tbl-sub">종목별 월간 분배율 · 분배금 · 기준가</div>
+          </div>
+          <div class="hist-sort-group">
+            <button class="btn hist-sort-btn active" data-desc="true" onclick="setHistorySort(true)">최신월 우선</button>
+            <button class="btn hist-sort-btn" data-desc="false" onclick="setHistorySort(false)">과거월 우선</button>
+          </div>
+        </div>
+        <div id="historyTables" style="padding:10px"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ══ UPDATE PANEL ══ -->
 <section id="update" class="panel content">
   <div class="update-grid">
@@ -754,6 +809,8 @@ applyAprilUpdate(RAW_DATA, APRIL_UPDATE_PATCH);
 applyMayUpdate(RAW_DATA, MAY_UPDATE_PATCH);
 let DATA = buildData(RAW_DATA);
 const COLORS=['#4f8cff','#16c784','#ffb020','#ff5c72','#7c3aed','#06b6d4','#f97316','#84cc16','#ec4899','#64748b','#14b8a6','#a855f7'];
+let HISTORY_SELECTED_CODES = new Set();   // 히스토리 탭에서 선택된 종목코드 집합 (포트폴리오 선택과는 별개)
+let HISTORY_SORT_DESC = true;             // 표 정렬 방향: true=최신월 우선, false=과거월 우선
 
 function buildData(raw){
   const priceMap={}; raw.PRICE.forEach(p=>{ if(!p.code)return; if(!priceMap[p.code] || String(p.date)>String(priceMap[p.code].date)) priceMap[p.code]=p; });
@@ -789,9 +846,9 @@ function init(){
   fill('category',[...new Set(DATA.items.map(x=>x.category).filter(Boolean))]); fill('schedule',[...new Set(DATA.items.map(x=>x.schedule).filter(Boolean))]); fill('manager',[...new Set(DATA.items.map(x=>x.manager).filter(Boolean))]); fill('selectorCat',[...new Set(DATA.items.map(x=>x.category).filter(Boolean))]);
   document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>goTab(b.dataset.tab));
   ['q','category','schedule','manager','rate','sort'].forEach(id=>document.getElementById(id).addEventListener('input',renderTable));
-  renderMetrics(); renderTable(); renderFinder(); renderEtfSelector(); runPortfolio();
+  renderMetrics(); renderTable(); renderFinder(); renderEtfSelector(); runPortfolio(); renderHistorySelector(); renderHistoryTab();
 }
-function goTab(id){document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===id)); if(id==='finder')renderFinder(); if(id==='simulator')runPortfolio();}
+function goTab(id){document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===id));document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===id)); if(id==='finder')renderFinder(); if(id==='simulator')runPortfolio(); if(id==='history'){renderHistorySelector();renderHistoryTab();}}
 function fill(id,vals){const el=document.getElementById(id);el.innerHTML=el.options[0].outerHTML+vals.sort().map(v=>`<option>${esc(v)}</option>`).join('')}
 function filtered(){const q=document.getElementById('q').value.toLowerCase().trim(),cat=document.getElementById('category').value,sch=document.getElementById('schedule').value,mgr=document.getElementById('manager').value,rate=Number(document.getElementById('rate').value),sort=document.getElementById('sort').value;return DATA.items.filter(x=>(!q||[x.code,x.name,x.baseAsset,x.strategy,x.memo].join(' ').toLowerCase().includes(q))&&(!cat||x.category===cat)&&(!sch||x.schedule===sch)&&(!mgr||x.manager===mgr)&&n(x.latestRate)>=rate).sort((a,b)=>n(b[sort])-n(a[sort]))}
 function renderMetrics(){const items=DATA.items;const top=[...items].sort((a,b)=>n(b.latestRate)-n(a.latestRate))[0];const amt=[...items].sort((a,b)=>n(b.latestAmount)-n(a.latestAmount))[0];const over1=items.filter(x=>n(x.latestRate)>=1).length,over2=items.filter(x=>n(x.latestRate)>=2).length;const safe=items.filter(x=>x.safeAsset).length;const low=[...items].sort((a,b)=>n(a.riskScore)-n(b.riskScore))[0];document.getElementById('metrics').innerHTML=[kpi('최고 분배율',`${esc(top?.name||'-')}<br>${fmt(top?.latestRate)}%`,top?.latestMonth||''),kpi('최고 분배금',`${esc(amt?.name||'-')}<br>${won(amt?.latestAmount)}`,amt?.latestMonth||''),kpi('월 1% 이상',over1+'개','최근월 기준'),kpi('월 2% 이상',over2+'개','고분배 후보'),kpi('연금 안전 후보',safe+'개','안전/채권/방어형'),kpi('저위험 후보',`${esc(low?.name||'-')}<br>위험 ${fmt(low?.riskScore)}`,'점수 낮을수록 안정')].join('')}
@@ -1251,7 +1308,7 @@ function init(){
   fill('selectorCat',[...new Set(DATA.items.map(x=>x.category).filter(Boolean))]);
   document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>goTab(b.dataset.tab));
   ['q','category','schedule','manager','rate','sort'].forEach(id=>document.getElementById(id).addEventListener('input',renderTable));
-  renderMetrics(); renderTable(); renderFinder(); renderEtfSelector(); runPortfolio();
+  renderMetrics(); renderTable(); renderFinder(); renderEtfSelector(); runPortfolio(); renderHistorySelector(); renderHistoryTab();
 }
 
 function renderMetrics(){
@@ -1433,6 +1490,181 @@ function renderEtfSelector(){
       <div class="sel-metric">${fmt(x.latestRate)}%<span>${won(x.latestAmount)}</span></div>
     </div>`).join('');
   updateSelectionSummary();
+}
+
+/* ════ HISTORY TAB (월별 히스토리) ════ */
+// (HISTORY_SELECTED_CODES, HISTORY_SORT_DESC 변수는 스크립트 상단에서 선언됨)
+
+// 체크박스 선택 여부 확인
+function isHistorySelected(code){ return HISTORY_SELECTED_CODES.has(String(code)); }
+
+// 체크박스 토글 시 선택 집합을 갱신하고 차트/표를 다시 그림
+function toggleHistorySelection(code, checked){
+  code = String(code);
+  if(checked){ HISTORY_SELECTED_CODES.add(code); } else { HISTORY_SELECTED_CODES.delete(code); }
+  renderHistoryTab();
+}
+
+// 선택 전체 해제
+function clearHistorySelection(){
+  HISTORY_SELECTED_CODES.clear();
+  renderHistorySelector();
+  renderHistoryTab();
+}
+
+// 표 정렬 방향 변경 (최신월 우선 / 과거월 우선)
+function setHistorySort(desc){
+  HISTORY_SORT_DESC = desc;
+  document.querySelectorAll('.hist-sort-btn').forEach(btn=>{
+    btn.classList.toggle('active', btn.dataset.desc === String(desc));
+  });
+  renderHistoryTab();
+}
+
+// 좌측 종목 선택 리스트에 표시할 후보 목록 (분배 기록이 있는 종목만, 검색어로 필터링)
+function historySelectorItems(){
+  const q = (document.getElementById('historyQ')?.value || '').toLowerCase().trim();
+  let rows = DATA.items.filter(x => Array.isArray(x.distributions) && x.distributions.some(d => n(d.distributionRate) > 0));
+  if(q){
+    rows = rows.filter(x => [x.code, x.name, x.baseAsset].join(' ').toLowerCase().includes(q));
+  }
+  return rows.sort((a,b) => String(a.name).localeCompare(String(b.name)));
+}
+
+// 좌측 종목 선택 리스트 렌더링
+function renderHistorySelector(){
+  const box = document.getElementById('historySelectList');
+  if(!box) return;
+  const rows = historySelectorItems();
+  box.innerHTML = rows.map(x => `
+    <div class="sel-row">
+      <input type="checkbox" ${isHistorySelected(x.code)?'checked':''} onchange="toggleHistorySelection('${esc(x.code)}',this.checked)"/>
+      <div>
+        <div class="sel-name">${esc(x.name)}</div>
+        <div class="sel-sub">${esc(x.code)} · ${esc(x.category||'-')}</div>
+      </div>
+      <div class="sel-metric">${fmt(x.latestRate)}%<span>${esc(x.latestMonth||'-')}</span></div>
+    </div>`).join('');
+  const summary = document.getElementById('historySelectionSummary');
+  if(summary){
+    const count = HISTORY_SELECTED_CODES.size;
+    summary.textContent = count ? `선택 ${count}개 종목 비교 중` : '선택 종목 없음';
+  }
+}
+
+// 선택된 여러 종목의 분배율 데이터를 합쳐 월 목록(오름차순)을 만든다
+function historyUnionMonths(items){
+  const monthSet = new Set();
+  items.forEach(it => it.distributions.forEach(d => { if(n(d.distributionRate) > 0) monthSet.add(d.month); }));
+  return Array.from(monthSet).sort();
+}
+
+// 여러 종목의 분배율 추이를 한 그래프에 겹쳐 그리는 멀티라인 SVG 차트
+function multiSvgLine(items){
+  const months = historyUnionMonths(items);
+  if(months.length < 2){
+    return '<div class="small" style="padding:16px">표시할 데이터가 부족합니다 (최소 2개월 이상의 분배 기록이 필요합니다).</div>';
+  }
+  const w = 900, h = 340, p = 40;
+  // 종목별 {월:분배율} 매핑과 선 좌표(points)를 미리 계산
+  const series = items.map((it, idx) => {
+    const rateByMonth = {};
+    it.distributions.forEach(d => { rateByMonth[d.month] = n(d.distributionRate); });
+    const pts = months.map((m, i) => {
+      const v = rateByMonth[m];
+      if(v === undefined || v === null || !(v > 0)) return null;
+      const x = p + i * (w - 2*p) / Math.max(1, months.length - 1);
+      return { x, v, m };
+    });
+    return { code: it.code, name: it.name, color: COLORS[idx % COLORS.length], pts };
+  });
+  // y축 스케일 계산을 위해 전체 시리즈의 값 범위를 모은다
+  const allValues = series.flatMap(s => s.pts.filter(Boolean).map(pt => pt.v));
+  const maxVal = allValues.length ? Math.max(...allValues) * 1.15 : 1;
+  const minVal = 0;
+  const toY = v => h - p - (v - minVal) / (maxVal - minVal) * (h - 2*p);
+
+  let svg = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="340">`;
+  svg += `<rect x="0" y="0" width="${w}" height="${h}" fill="#fbfdff"/>`;
+  svg += `<line x1="${p}" y1="${h-p}" x2="${w-p}" y2="${h-p}" stroke="#cbd5e1"/>`;
+  svg += `<line x1="${p}" y1="${p}" x2="${p}" y2="${h-p}" stroke="#cbd5e1"/>`;
+
+  series.forEach(s => {
+    const validPts = s.pts.filter(Boolean);
+    if(validPts.length >= 2){
+      const poly = validPts.map(pt => `${pt.x},${toY(pt.v)}`).join(' ');
+      svg += `<polyline points="${poly}" fill="none" stroke="${s.color}" stroke-width="2.5"/>`;
+    }
+    svg += validPts.map(pt => `<circle cx="${pt.x}" cy="${toY(pt.v)}" r="3.5" fill="${s.color}"/>`).join('');
+  });
+
+  // x축 월 라벨: 항목이 많으면 일부만 표시해서 겹치지 않게 함
+  const labelStep = Math.max(1, Math.ceil(months.length / 12));
+  months.forEach((m, i) => {
+    if(i % labelStep !== 0) return;
+    const x = p + i * (w - 2*p) / Math.max(1, months.length - 1);
+    svg += `<text x="${x}" y="${h-10}" text-anchor="middle" font-size="10" fill="#64748b">${m}</text>`;
+  });
+  svg += '</svg>';
+  return svg;
+}
+
+// 히스토리 탭의 그래프 + 범례 + 종목별 상세 표를 전부 다시 그림
+function renderHistoryTab(){
+  const chartBox = document.getElementById('historyChart');
+  const legendBox = document.getElementById('historyLegend');
+  const tablesBox = document.getElementById('historyTables');
+  if(!chartBox || !legendBox || !tablesBox) return;
+
+  const codes = Array.from(HISTORY_SELECTED_CODES);
+  if(!codes.length){
+    chartBox.innerHTML = '<div class="small" style="padding:16px">왼쪽에서 비교할 종목을 선택하세요. 여러 종목을 선택하면 그래프에 함께 표시됩니다.</div>';
+    legendBox.innerHTML = '';
+    tablesBox.innerHTML = '';
+    return;
+  }
+
+  const items = codes.map(code => DATA.items.find(x => String(x.code) === code)).filter(Boolean);
+
+  chartBox.innerHTML = multiSvgLine(items);
+
+  legendBox.innerHTML = items.map((it, idx) => `
+    <span class="hist-legend-item">
+      <span class="hist-dot" style="background:${COLORS[idx % COLORS.length]}"></span>${esc(it.name)}
+    </span>`).join('');
+
+  tablesBox.innerHTML = items.map((it, idx) => {
+    const color = COLORS[idx % COLORS.length];
+    let rows = (it.distributions || []).filter(d => n(d.distributionRate) > 0 || d.distributionAmount != null);
+    rows = [...rows].sort((a, b) => {
+      const cmp = String(a.month).localeCompare(String(b.month));
+      return HISTORY_SORT_DESC ? -cmp : cmp;
+    });
+    const rowsHtml = rows.map(d => `
+      <tr>
+        <td>${esc(d.month)}</td>
+        <td>${fmt(d.distributionRate)}%</td>
+        <td>${won(d.distributionAmount)}</td>
+        <td>${won(d.basePrice)}</td>
+      </tr>`).join('');
+    return `
+      <div class="update-card" style="margin-bottom:14px">
+        <div class="update-card-head">
+          <div class="board-hd-title">
+            <span class="hist-dot" style="background:${color};display:inline-block;margin-right:6px"></span>
+            ${esc(it.name)} <span class="small" style="color:var(--text2)">(${esc(it.code)})</span>
+          </div>
+        </div>
+        <div class="update-card-body" style="padding:0">
+          <div class="tbl-scroll" style="max-height:260px">
+            <table>
+              <thead><tr><th>월</th><th>분배율</th><th>분배금</th><th>기준가</th></tr></thead>
+              <tbody>${rowsHtml || '<tr><td colspan="4" class="small">표시할 데이터가 없습니다</td></tr>'}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 init();
