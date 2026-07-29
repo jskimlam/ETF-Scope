@@ -819,6 +819,15 @@ function applyAprilUpdate(raw,patches){
 
 applyAprilUpdate(RAW_DATA, APRIL_UPDATE_PATCH);
 applyMayUpdate(RAW_DATA, MAY_UPDATE_PATCH);
+function normalizeScheduleLabel(value){
+  const label=String(value||'').trim().replace(/_/g,' ').replace(/\s+/g,' ');
+  if(label==='월배당 월말')return '월배당 월말';
+  if(label==='월배당 중순'||label==='월배당 월중')return '월배당 중순';
+  return label;
+}
+RAW_DATA.ETF_MASTER.forEach(item=>{
+  item.schedule=normalizeScheduleLabel(item.schedule);
+});
 let DATA = buildData(RAW_DATA);
 const COLORS=['#4f8cff','#16c784','#ffb020','#ff5c72','#7c3aed','#06b6d4','#f97316','#84cc16','#ec4899','#64748b','#14b8a6','#a855f7'];
 let HISTORY_SELECTED_CODES = new Set();   // 히스토리 탭에서 선택된 종목코드 집합 (포트폴리오 선택과는 별개)
